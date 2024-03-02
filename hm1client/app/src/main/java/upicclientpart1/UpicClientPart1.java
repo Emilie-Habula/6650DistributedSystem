@@ -18,8 +18,7 @@ import util.RequestSender;
 // Main class representing the UpicClientPart1 application
 public class UpicClientPart1 {
     // EC2 server path
-    private static final String EC2_PATH = "http://ec2-35-87-80-19.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
-
+    private static final String EC2_PATH = "http://ec2-54-202-208-244.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
     // Number of threads to be created
     private static final int NUM_THREADS = 32;
 
@@ -28,63 +27,72 @@ public class UpicClientPart1 {
 
     // Total number of requests to be sent
     private static final int TOTAL_REQUESTS = 200000;
+    private static final int PHASE2_THREAD_NUMBER = 200;
 
 
     // Main method
     public static void main(String[] args) throws InterruptedException {
         // Atomic counter for tracking the number of failures
-        AtomicInteger failureCount = new AtomicInteger();
+        AtomicInteger failureCount1 = new AtomicInteger();
+        AtomicInteger failureCount2 = new AtomicInteger();
         // Latch for synchronization among threads
-        CountDownLatch totalLatch = new CountDownLatch(NUM_THREADS * 2);
-        // Latch for signaling the event generator thread to start
-        CountDownLatch singleLatch = new CountDownLatch(1);
+        CountDownLatch totalLatch = new CountDownLatch(NUM_THREADS);
+        // Latch for signaling the event generator thread to star
+        CountDownLatch phase2latch = new CountDownLatch(PHASE2_THREAD_NUMBER);
 
         //Create separate thread to generate events
         EventGenerator eventGenerator = new EventGenerator(TOTAL_REQUESTS);
         new Thread(eventGenerator).start();
 
         // Array to store threads
-        Thread[] threads = new Thread[2 * NUM_THREADS];
+        Thread[] threads = new Thread[NUM_THREADS + PHASE2_THREAD_NUMBER];
         // Record start time for measuring runtime
         long startTime = System.currentTimeMillis();
 
         System.out.println("Creating threads");
         //Create and start the first set of threads
         for (int i = 0; i < NUM_THREADS; i++) {
-            threads[i] = new Thread(new RequestSender(REQUESTS_PER_THREAD, totalLatch, singleLatch, EC2_PATH, i,
-                failureCount, eventGenerator));
+            threads[i] = new Thread(new RequestSender(REQUESTS_PER_THREAD, totalLatch, EC2_PATH, i,
+                failureCount1, eventGenerator));
         }
 
         for (int i = 0; i < NUM_THREADS; i++) {
             threads[i].start();
         }
-        // Wait for the event generator thread to start
-        singleLatch.await();
 
+        totalLatch.await();
+        double midTime = System.currentTimeMillis();
         System.out.println("Creating additional threads");
         // Calculate average remaining requests for additional threads
-        int avgRemainingRequests = (TOTAL_REQUESTS - REQUESTS_PER_THREAD * NUM_THREADS)/ NUM_THREADS;
+        int avgRemainingRequests = (TOTAL_REQUESTS - REQUESTS_PER_THREAD * NUM_THREADS)/ PHASE2_THREAD_NUMBER;
 
         // Create and start the second set of threads
-        for (int i = NUM_THREADS; i < 2 * NUM_THREADS; i++) {
-            threads[i] = new Thread(new RequestSender(avgRemainingRequests, totalLatch, null, EC2_PATH,
-                i, failureCount, eventGenerator));
+        for (int i = NUM_THREADS; i < NUM_THREADS + PHASE2_THREAD_NUMBER; i++) {
+            threads[i] = new Thread(new RequestSender(avgRemainingRequests, phase2latch, EC2_PATH, i, failureCount2, eventGenerator));
         }
 
-        for (int i = NUM_THREADS; i < 2 * NUM_THREADS; i++) {
+        for (int i = NUM_THREADS; i < NUM_THREADS + PHASE2_THREAD_NUMBER; i++) {
             threads[i].start();
         }
 
         // Wait for all threads to finish
-        totalLatch.await();
+        phase2latch.await();
 
         // Record end time for measuring runtime
         long endTime = System.currentTimeMillis();
 
         // Output results
-        System.out.println("Total number of success requests:" + (TOTAL_REQUESTS - failureCount.get()));
-        System.out.println("Total number of failure requests:" + failureCount.get());
-        System.out.println("Total runtime: " + (endTime - startTime)/1000 + " seconds");
-        System.out.println("Total throughout: " + TOTAL_REQUESTS * 1000/(endTime - startTime) + " requests/seconds");
+        System.out.println("Phase1 of success requests:" + (TOTAL_REQUESTS - failureCount1.get()));
+        System.out.println("Phase1 of failure requests:" + failureCount1.get());
+        System.out.println("Phase1 Total runtime: " + (midTime - startTime)/1000 + " seconds");
+        System.out.println("Phase1 Total throughout: " + TOTAL_REQUESTS * 1000/(endTime - startTime) + " requests/seconds");
+
+        // Output results
+        System.out.println("Phase2 of success requests:" + (TOTAL_REQUESTS - failureCount2.get()));
+        System.out.println("Phase2 of failure requests:" + failureCount2.get());
+        System.out.println("Phase2 Total runtime: " + (endTime - midTime)/1000 + " seconds");
+        System.out.println("Phase2 Total throughout: " + TOTAL_REQUESTS * 1000/(endTime - startTime) + " requests/seconds");
+
     }
+
 }

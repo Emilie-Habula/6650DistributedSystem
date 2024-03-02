@@ -5,6 +5,8 @@ import io.swagger.client.ApiException;
 import io.swagger.client.ApiResponse;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import model.SkierRideEvent;
@@ -31,7 +33,6 @@ public class RequestSender implements Runnable {
 
   private final CountDownLatch totalLatch;
 
-  private final CountDownLatch singleLatch;
 
   private final SkiersApi apiInstance;
 
@@ -43,15 +44,15 @@ public class RequestSender implements Runnable {
 
   private final FileUtil fileUtil;
 
-  public RequestSender(int requestsToSend, CountDownLatch totalLatch,
-      CountDownLatch singleLatch, String path,
+  private List<ResultData> results = new ArrayList<>();
+
+  public RequestSender(int requestsToSend, CountDownLatch totalLatch, String path,
       int threadNum, AtomicInteger failureCount,
       EventGenerator eventGenerator) {
-    this(requestsToSend, totalLatch, singleLatch, path, threadNum, failureCount, eventGenerator, null);
+    this(requestsToSend, totalLatch, path, threadNum, failureCount, eventGenerator, null);
   }
 
-  public RequestSender(int requestsToSend, CountDownLatch totalLatch,
-      CountDownLatch singleLatch, String path,
+  public RequestSender(int requestsToSend, CountDownLatch totalLatch, String path,
       int threadNum, AtomicInteger failureCount,
       EventGenerator eventGenerator, FileUtil fileUtil) {
     ApiClient apiClient = new ApiClient();
@@ -59,7 +60,6 @@ public class RequestSender implements Runnable {
     this.apiInstance = new SkiersApi(apiClient);
     this.requestsToSend = requestsToSend;
     this.totalLatch = totalLatch;
-    this.singleLatch = singleLatch;
     this.threadNum = threadNum;
     this.failureCount = failureCount;
     this.eventGenerator = eventGenerator;
@@ -77,38 +77,36 @@ public class RequestSender implements Runnable {
 
       long startTime = System.currentTimeMillis();
       int statusCode = 0;
-      try {
-        int retry;
-        for(retry = 0; retry < MAX_RETRY; retry++) {
+      int retry;
+      for(retry = 0; retry < MAX_RETRY; retry++) {
+        try {
           ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(liftRide,
               event.getResortId(), event.getSeasonId(), event.getDayId(), event.getSkierId());
           statusCode = response.getStatusCode();
           if (statusCode / 100 == 2) {
-            if(i % 100 == 99) {
+            if (i % 100 == 99) {
               System.out.println("Thread " + threadNum + " processed " + (i + 1) + " requests");
             }
             break;
           }
+        } catch (Exception e) {
+          // continue the retry
         }
-        if(retry == MAX_RETRY) {
-          failureCount.incrementAndGet();
-          System.out.println("Thread " + threadNum + " failed to process " + (i+1) + " requests");
-        }
-        long endTime = System.currentTimeMillis();
-        if(fileUtil != null) {
-          fileUtil.write("" + startTime + ",POST," + (endTime - startTime) + "," + statusCode);
-        }
-      } catch (ApiException e) {
-        System.err.println("Exception when calling SkiersApi#writeNewLiftRide");
-        e.printStackTrace();
       }
+      if(retry == MAX_RETRY) {
+        failureCount.incrementAndGet();
+        System.out.println("Thread " + threadNum + " failed to process " + (i+1) + " requests");
+      }
+      long endTime = System.currentTimeMillis();
+      results.add(new ResultData(startTime, endTime, statusCode, "POST"));
     }
     totalLatch.countDown(); // Signal that this thread has completed
 
-    if(singleLatch != null && singleLatch.getCount() > 0) {
-      singleLatch.countDown();
-    }
 
     System.out.println("Thread " + threadNum + " completed");
+  }
+
+  public List<ResultData> getResults(){
+    return results;
   }
 }

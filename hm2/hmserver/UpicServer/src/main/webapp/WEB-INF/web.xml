@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app>
+
+  <servlet>
+    <servlet-name>skiers</servlet-name>
+    <display-name>skiers</display-name>
+    <description>Write new lift ride</description>
+    <servlet-class>com.upic.upicserver.WriteNewLiftRideServlet</servlet-class>
+  </servlet>
+
+  <servlet-mapping>
+    <servlet-name>skiers</servlet-name>
+    <url-pattern>/skiers/*</url-pattern>
+  </servlet-mapping>
+
+</web-app>
