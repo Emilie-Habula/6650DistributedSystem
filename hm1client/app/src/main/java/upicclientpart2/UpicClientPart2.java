@@ -30,8 +30,12 @@ import util.ResultData;
 // Main class representing the UpicClientPart2 application
 public class UpicClientPart2 {
   // EC2 server path
-  private static final String EC2_PATH = "http://ec2-54-202-208-244.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
+  // single instance address
+  //"http://ec2-54-213-225-157.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
 
+  // load balance address
+  //"http://UpicLB-1428261547.us-west-2.elb.amazonaws.com:80/UpicServer-1.0-SNAPSHOT";
+  private static final String EC2_PATH = "http://UpicLB-1428261547.us-west-2.elb.amazonaws.com:80/UpicServer-1.0-SNAPSHOT";
   // Number of threads to be created
   private static final int NUM_THREADS = 32;
 
@@ -41,7 +45,7 @@ public class UpicClientPart2 {
   // Total number of requests to be sent
   private static final int TOTAL_REQUESTS = 200000;
 
-  private static final int PHASE2_THREAD_NUMBER = 32;
+  private static final int PHASE2_THREAD_NUMBER = 200;
 
   private static void writeResultsToCsv(List<ResultData> resultData, String fileName) {
     try (FileWriter writer = new FileWriter(fileName)) {
@@ -74,17 +78,18 @@ public class UpicClientPart2 {
     double average = requestTimes.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
     double p99 = requestTimes.get((int) Math.ceil(99.0 / 100.0 * requestTimes.size()) - 1);
 
-    // 打印统计值
-    System.out.println("Median: " + median);
-    System.out.println("Mean: " + average);
-    System.out.println("P99: " + p99);
-
     // 打印每一秒的请求数量
     System.out.println("Requests per second:");
     System.out.println(requestsPerSecond.size());
     requestsPerSecond.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
         .forEach(entry -> System.out.println("Second " + entry.getKey() + ": " + entry.getValue()));
+
+    // 打印统计值
+    System.out.println("Starting to write statistics.");
+    System.out.println("Median: " + median);
+    System.out.println("Mean: " + average);
+    System.out.println("P99: " + p99);
   }
   // Main method
   public static void main(String[] args) throws InterruptedException, IOException {
@@ -161,15 +166,15 @@ public class UpicClientPart2 {
     calculateStatistics(resultData);
 
     // Output results
-    System.out.println("Phase1 of success requests:" + (TOTAL_REQUESTS - failureCount1.get()));
+    System.out.println("Phase1 of success requests:" + (NUM_THREADS * REQUESTS_PER_THREAD - failureCount1.get()));
     System.out.println("Phase1 of failure requests:" + failureCount1.get());
     System.out.println("Phase1 Total runtime: " + (midTime - startTime)/1000 + " seconds");
-    System.out.println("Phase1 Total throughout: " + TOTAL_REQUESTS * 1000/(endTime - startTime) + " requests/seconds");
+    System.out.println("Phase1 Total throughout: " + NUM_THREADS * REQUESTS_PER_THREAD * 1000/(endTime - startTime) + " requests/seconds");
 
     // Output results
-    System.out.println("Phase2 of success requests:" + (TOTAL_REQUESTS - failureCount2.get()));
+    System.out.println("Phase2 of success requests:" + (TOTAL_REQUESTS - NUM_THREADS * REQUESTS_PER_THREAD - failureCount2.get()));
     System.out.println("Phase2 of failure requests:" + failureCount2.get());
     System.out.println("Phase2 Total runtime: " + (endTime - midTime)/1000 + " seconds");
-    System.out.println("Phase2 Total throughout: " + TOTAL_REQUESTS * 1000/(endTime - startTime) + " requests/seconds");
+    System.out.println("Phase2 Total throughout: " + (TOTAL_REQUESTS - NUM_THREADS * REQUESTS_PER_THREAD) * 1000/(endTime - startTime) + " requests/seconds");
   }
 }

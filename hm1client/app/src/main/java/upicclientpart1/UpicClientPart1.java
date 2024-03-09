@@ -18,7 +18,8 @@ import util.RequestSender;
 // Main class representing the UpicClientPart1 application
 public class UpicClientPart1 {
     // EC2 server path
-    private static final String EC2_PATH = "http://ec2-54-202-208-244.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
+    //load balance address
+    private static final String EC2_PATH = "http://UpicLB-1428261547.us-west-2.elb.amazonaws.com:80/UpicServer-1.0-SNAPSHOT";
     // Number of threads to be created
     private static final int NUM_THREADS = 32;
 
