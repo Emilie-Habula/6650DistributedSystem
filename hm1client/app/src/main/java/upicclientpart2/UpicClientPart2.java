@@ -31,7 +31,7 @@ import util.ResultData;
 public class UpicClientPart2 {
   // EC2 server path
   // single instance address
-  //"http://ec2-54-213-225-157.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
+  //"http://ec2-54-202-208-244.us-west-2.compute.amazonaws.com:8080/UpicServer-1.0-SNAPSHOT";
 
   // load balance address
   //"http://UpicLB-1428261547.us-west-2.elb.amazonaws.com:80/UpicServer-1.0-SNAPSHOT";
